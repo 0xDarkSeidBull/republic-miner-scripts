@@ -21,11 +21,15 @@ VPS (Hetzner / DigitalOcean)          Windows Laptop (NVIDIA GPU)
 
 ---
 
-PART 1 — CPU Validator Setup (VPS)
+PART 1 CPU Validator Setup (VPS)
 Get a VPS
 
--Hetzner (recommended): [hetzner.com](https://console.hetzner.com/)  CPX21 or higher
--DigitalOcean (free credits): [digitalocean.com](https://m.do.co/c/b91c4951c91b)
+-Hetzner (recommended): 
+[hetzner.com](https://console.hetzner.com/)  CPX21 or higher
+
+-DigitalOcean (free credits): 
+[digitalocean.com](https://m.do.co/c/b91c4951c91b)
+
 -Minimum: 2 CPU, 4GB RAM, 80GB SSD, Ubuntu 24.04
 
 
