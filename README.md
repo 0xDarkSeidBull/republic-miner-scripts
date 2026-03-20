@@ -111,9 +111,33 @@ CTRL + C
 
 ---
 
-## Step 7 — Download Latest Snapshot
+## Step 7 — Create Service file :
 
-This syncs your node instantly instead of waiting hours.
+```bash
+sudo tee /etc/systemd/system/republicd.service > /dev/null <<EOF
+[Unit]
+Description=Republic Protocol Node
+After=network-online.target
+
+[Service]
+User=root
+WorkingDirectory=/root
+ExecStart=/usr/local/bin/republicd start
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable republicd
+```
+
+---
+
+## Step 8 - Snapshot
 
 ```bash
 sudo apt install lz4 -y
@@ -123,19 +147,22 @@ curl -L https://snapshot.vinjan-inc.com/republic/latest.tar.lz4 \
 
 ---
 
-## Step 8 — Start Node as Service
+## Step 9 - Start node
 
 ```bash
-sudo systemctl restart republicd
-
-# Check logs
+wget https://github.com/RepublicAI/networks/releases/download/v0.3.0/republicd-linux-amd64 -O republicd
+chmod +x republicd
+sudo mv republicd /usr/local/bin/republicd
+republicd version
+# Expected: 0.3.0
+sudo systemctl start republicd
 sudo journalctl -u republicd -f -o cat
-# Example: INF finalizing commit of block height=684344
 ```
 
 ---
 
-## Step 9 — Check Sync Status
+
+## Step 10 — Check Sync Status
 
 ```bash
 republicd status | jq '.sync_info'
