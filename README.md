@@ -30,12 +30,21 @@ VPS (Hetzner / DigitalOcean)          Windows Laptop (NVIDIA GPU)
 - **Minimum specs:** 2 CPU, 4GB RAM, 80GB SSD, Ubuntu 24.04
 
 ---
+## STEP 0 — Clean Previous Installation (Fresh Start)
+```bash
+sudo systemctl stop republicd 2>/dev/null || true
+pkill republicd 2>/dev/null || true
+rm -rf $HOME/.republic
+sudo rm -f /usr/local/bin/republicd
+```
 
-## Step 1 — Update Server
+
+## 📦 STEP 1 — Install Dependencies
+
 
 ```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install curl git wget htop tmux build-essential jq make lz4 gcc unzip -y
+apt update && apt upgrade -y
+apt install curl tar wget clang pkg-config libssl-dev jq build-essential bsdmainutils git make ncdu gcc chrony liblz4-tool -y
 ```
 
 ---
@@ -55,66 +64,73 @@ go version
 
 ---
 
-## Step 3 — Install republicd Binary
 
+## STEP 3 — Install republicd v0.1.0 (IMPORTANT)
 ```bash
 cd $HOME
 wget https://github.com/RepublicAI/networks/releases/download/v0.1.0/republicd-linux-amd64 -O republicd
 chmod +x republicd
-sudo mv republicd /usr/local/bin/republicd
-republicd version
+mv republicd /usr/local/bin/republicd
+```
+---
+
+
+##  STEP 4 — Initialize Node
+
+
+```bash
+republicd init my-node --chain-id raitestnet_77701-1
 ```
 
 ---
 
-## Step 4 — Download Genesis File
+## STEP 5 — Download Genesis
+
 
 ```bash
-curl -L https://raw.githubusercontent.com/RepublicAI/networks/main/testnet/genesis.json \
-  -o $HOME/.republic/config/genesis.json
+curl -L https://raw.githubusercontent.com/RepublicAI/networks/main/testnet/genesis.json -o $HOME/.republic/config/genesis.json
 ```
 
 ---
 
-## Step 5 — Configure Peers
+## STEP 6 — Add Dynamic Working Peers (CRITICAL FIX)
+
 
 ```bash
-peers=$(curl -sS https://rpc-t.republic.vinjan-inc.com/net_info | \
-  jq -r '.result.peers[] | "\(.node_info.id)@\(.remote_ip):\(.node_info.listen_addr)"' | \
-  awk -F ':' '{print $1":"$(NF)}' | paste -sd "," -)
+peers=$(curl -sS https://rpc-t.republic.vinjan-inc.com/net_info | jq -r '.result.peers[] | "\(.node_info.id)@\(.remote_ip):\(.node_info.listen_addr)"' | awk -F ':' '{print $1":"$(NF)}' | paste -sd "," -)
 
 sed -i "s/^persistent_peers *=.*/persistent_peers = \"$peers\"/" $HOME/.republic/config/config.toml
+```
+
+---
+
+## ❌ STEP 7 — Disable State Sync (Use Stable P2P Sync)
+
+
+```bash
 sed -i 's/^enable *=.*/enable = false/' $HOME/.republic/config/config.toml
 sed -i 's/^seeds *=.*/seeds = ""/' $HOME/.republic/config/config.toml
 ```
 
 ---
 
-## Step 6 — Start Node (Initial Run)
-
+## STEP 8 — Start Node (Foreground Test)
 ```bash
 republicd start --chain-id raitestnet_77701-1
 ```
 
-You will see logs like:
-```
-finalized block
-executed block
-committed state
-indexed block events
-```
+You should see:
 
-Stop the node:
-```
+Ensure peers...
+Added peer...
+Stop after confirming:
+
 CTRL + C
-```
 
----
 
-## Step 7 — Create Service file :
-
+## STEP 9 — Create Systemd Service
 ```bash
-sudo tee /etc/systemd/system/republicd.service > /dev/null <<EOF
+tee /etc/systemd/system/republicd.service > /dev/null <<EOF
 [Unit]
 Description=Republic Protocol Node
 After=network-online.target
@@ -122,7 +138,7 @@ After=network-online.target
 [Service]
 User=root
 WorkingDirectory=/root
-ExecStart=/usr/local/bin/republicd start
+ExecStart=/usr/local/bin/republicd start --chain-id raitestnet_77701-1
 Restart=always
 RestartSec=5
 LimitNOFILE=65535
@@ -130,14 +146,9 @@ LimitNOFILE=65535
 [Install]
 WantedBy=multi-user.target
 EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable republicd
 ```
 
----
-
-## Step 8 - Snapshot
+## Step 10 - Snapshot
 
 ```bash
 sudo apt install lz4 -y
@@ -147,7 +158,7 @@ curl -L https://snapshot.vinjan-inc.com/republic/latest.tar.lz4 \
 
 ---
 
-## Step 9 - Start node
+## Step 11 - Start node
 
 ```bash
 wget https://github.com/RepublicAI/networks/releases/download/v0.3.0/republicd-linux-amd64 -O republicd
@@ -162,7 +173,7 @@ sudo journalctl -u republicd -f -o cat
 ---
 
 
-## Step 10 — Check Sync Status
+## Step 12 — Check Sync Status
 
 ```bash
 republicd status | jq '.sync_info'
@@ -183,6 +194,91 @@ address: rai1xwuht66fmkmzvqsud8px79qgalmqglst57nt92
 name: wallet
 type: local
 ```
+
+## CASE1A Get Validator PubKey
+```bash
+republicd comet show-validator
+```
+
+## CASE1B Create validator.json
+```bash
+nano validator.json
+```
+
+You will see something like this:
+```bash
+{
+  "pubkey": {
+    "@type": "/cosmos.crypto.ed25519.PubKey",
+    "key": "PASTE_YOUR_PUBKEY_HERE"
+  },
+  "amount": "1000000000000000000arai",
+  "moniker": "your_moniker",
+  "identity": "",
+  "website": "",
+  "security_contact": "",
+  "details": "dirtdark",
+  "commission-rate": "0.999",
+  "commission-max-rate": "1.000",
+  "commission-max-change-rate": "0.999",
+  "min-self-delegation": "1"
+}
+```
+
+
+Note: you need to enter pubkey from ## CASE1A Get Validator PubKey
+  `"key": "PASTE_YOUR_PUBKEY_HERE"` and change your_moniker to your desired name
+
+
+## CASE1C Create Validator TX
+
+```bash
+republicd tx staking create-validator validator.json \
+  --from xyzguide \
+  --chain-id raitestnet_77701-1 \
+  --gas auto \
+  --gas-adjustment 1.5 \
+  --gas-prices 160000000000000arai  \
+  --yes
+```
+
+Change xyzguide to your wallet name you get from ## CASE 1 — New User (Create Wallet + Backup)
+
+
+## CASE1D : Verify Validator
+
+```bash
+republicd query staking validator \
+$(republicd keys show xyzguide --bech val -a)
+```
+
+Change xyzguide to your wallet name you get from ## CASE 1 — New User (Create Wallet + Backup)
+
+
+Expected:
+`BOND_STATUS_BONDED
+jailed: false`
+
+## CASE1E: Link Validator to Dashboard
+```bash
+republicd tx bank send \
+  xyzguide \
+  $(republicd keys show xyzguide -a) \
+  1000000000000000arai \
+  --chain-id raitestnet_77701-1 \
+  --from xyzguide \
+  --note "YOUR_REF_CODE" \
+  --gas auto \
+  --gas-adjustment 1.5 \
+  --gas-prices 160000000000000arai  \
+  --yes
+```
+
+Change xyzguide to your wallet name you get from ## CASE 1 — New User (Create Wallet + Backup)
+
+"YOUR_REF_CODE" from  https://points.republicai.io
+
+
 
 You will also receive a **mnemonic phrase** — save it offline (notepad / paper / password manager). Without it you **cannot recover your wallet**.
 
